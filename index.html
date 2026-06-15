@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nagios Master Setup Guide</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <h2>Nagios Docs</h2>
+      <p>Complete v4.4.6 Guide</p>
+    </div>
+    <ul>
+      <li class="nav-section-title">PART 1: CORE SETUP</li>
+      <li><a href="#architecture">📌 Architecture</a></li>
+      <li><a href="#core-step-1">01. Apache Install</a></li>
+      <li><a href="#core-step-2">02. Nagios Install</a></li>
+      <li><a href="#core-step-3">03. CGI Module</a></li>
+      <li><a href="#core-step-4">04. Admin Password</a></li>
+      <li><a href="#core-step-5">05. Services Management</a></li>
+      <li><a href="#core-step-6">06. Config Verification</a></li>
+      <li><a href="#core-step-7">07. Firewall Rules</a></li>
+      <li><a href="#core-step-8">08. Web Dashboard</a></li>
+
+      <li class="nav-section-title" style="margin-top: 25px;">PART 2: AUTO HOST</li>
+      <li><a href="#prerequisite">⚙️ Pre-requisites</a></li>
+      <li><a href="#workflow">📌 Workflow Diagram</a></li>
+      <li><a href="#auto-step-1">01. Admin Folder Setup</a></li>
+      <li><a href="#auto-step-2">02. Apache URL Config</a></li>
+      <li><a href="#auto-step-3">03. Basic Auth Setup</a></li>
+      <li><a href="#auto-step-4">04. Backend Script</a></li>
+      <li><a href="#auto-step-5">05. sudo Permission</a></li>
+      <li><a href="#auto-step-6">06. PHP Frontend UI</a></li>
+      <li><a href="#final-step">🚀 Final Launch</a></li>
+    </ul>
+  </nav>
+
+  <main class="content">
+    
+    <header class="main-header">
+      <span class="part-badge">PART 1</span>
+      <h1>Nagios Core Installation & Configuration</h1>
+      <p class="subtitle">Ubuntu VM-e Nagios Monitoring Engine setup korar step-by-step complete documentation</p>
+    </header>
+    
+    <section id="architecture" class="doc-card">
+      <h2>Infrastructure Architecture</h2>
+      <p>Nagios ecosystem-er core components gulo nicher hierarchy onujayi kaj kore:</p>
+      <div class="terminal-box">
+        <pre><code>Ubuntu VM
+│
+├── Apache2 (Web Server)
+│
+├── Nagios Core (Monitoring Engine)
+│
+├── Nagios Plugins (Check Tools)
+│
+└── Web Panel (GUI Dashboard)</code></pre>
+      </div>
+    </section>
+
+    <section id="core-step-1" class="doc-card">
+      <div class="step-badge">Step 01</div>
+      <h2>Apache Web Server Installation</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo apt install apache2 -y</code></pre>
+      </div>
+      <table class="info-table">
+        <thead>
+          <tr>
+            <th width="30%">Component</th>
+            <th>Details & Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Apache2 কি?</strong></td>
+            <td>Apache holo ekti powerful web server. Nagios GUI/Web Dashboard-ke browser-e properly render o show korar jonno Apache obossoi projon.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="core-step-2" class="doc-card">
+      <div class="step-badge">Step 02</div>
+      <h2>Nagios Core & Plugins Installation</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo apt install nagios4 nagios-plugins nagios-plugins-contrib -y</code></pre>
+      </div>
+      <p class="table-caption">📦 Ei command-er madhome nicher package gulo install hoy:</p>
+      <table class="info-table">
+        <thead>
+          <tr>
+            <th width="30%">Package Name</th>
+            <th>Function / Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline-code">nagios4</code></td>
+            <td>Eti holo mool monitoring engine ja backend-e sob calculations o alerts manage kore.</td>
+          </tr>
+          <tr>
+            <td><code class="inline-code">nagios-plugins</code></td>
+            <td>Host-er CPU, Disk utilization, RAM, ebong network ping check korar toolset.</td>
+          </tr>
+          <tr>
+            <td><code class="inline-code">nagios-plugins-contrib</code></td>
+            <td>Community-contributed atirrikto monitoring plugins o scripts.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="core-step-3" class="doc-card">
+      <div class="step-badge">Step 03</div>
+      <h2>Apache CGI & Rewrite Module Activation</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo a2enmod cgi rewrite
+sudo systemctl restart apache2</code></pre>
+      </div>
+      <table class="info-table">
+        <thead>
+          <tr>
+            <th width="30%">Action Type</th>
+            <th>Working Principle / Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>CGI Module Enable</strong></td>
+            <td>Nagios dynamic web interface o interactive scripts properly execute korar jonno Common Gateway Interface (CGI) support dorkar hoy.</td>
+          </tr>
+          <tr>
+            <td><strong>Server Restart</strong></td>
+            <td>Apache server-ke restart korar madhome notun dynamic modules gulo active hoy.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="core-step-4" class="doc-card">
+      <div class="step-badge">Step 04</div>
+      <h2>Nagios Authentication Password Creation</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo htpasswd -c /etc/nagios4/htpasswd.users nagiosadmin</code></pre>
+      </div>
+      <table class="info-table">
+        <thead>
+          <tr>
+            <th width="30%">Default User</th>
+            <th>Security Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline-code">nagiosadmin</code></td>
+            <td>Eti Nagios dashboard access korar mool administrative user account toiri kore ebong credential file securely store rakhe.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="core-step-5" class="doc-card">
+      <div class="step-badge">Step 05</div>
+      <h2>Services Enable & Status Verification</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo systemctl enable --now apache2
+sudo systemctl enable --now nagios4
+systemctl status apache2
+systemctl status nagios4</code></pre>
+      </div>
+      <p class="note-text">💡 <code class="inline-code">--now</code> flag-ti automatic vabe service boot-time e enable korar sange sange instant start-o kore dey.</p>
+    </section>
+
+    <section id="core-step-6" class="doc-card">
+      <div class="step-badge">Step 06</div>
+      <h2>Nagios Configuration File Verification</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo nagios4 -v /etc/nagios4/nagios.cfg</code></pre>
+      </div>
+      <p class="note-text">⚠️ Kono monitoring host/service create korar por configuration-e kono error ache kina ta check korar jonno eti mool command.</p>
+    </section>
+
+    <section id="core-step-7" class="doc-card">
+      <div class="step-badge">Step 07</div>
+      <h2>UFW Firewall Configuration</h2>
+      <p>Ubuntu system-er built-in firewall (UFW) active thakle nicher rule gulo allow korte hobe:</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo ufw enable
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 22/tcp
+sudo ufw reload</code></pre>
+      </div>
+      <table class="info-table">
+        <thead>
+          <tr>
+            <th width="30%">Port Number</th>
+            <th>Protocol</th>
+            <th>Service Target</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code class="inline-code">80</code></td>
+            <td>TCP</td>
+            <td>HTTP Unencrypted Web Access</td>
+          </tr>
+          <tr>
+            <td><code class="inline-code">443</code></td>
+            <td>TCP</td>
+            <td>HTTPS Secured Web Access</td>
+          </tr>
+          <tr>
+            <td><code class="inline-code">22</code></td>
+            <td>TCP</td>
+            <td>SSH Remote Terminal Access</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="core-step-8" class="doc-card">
+      <div class="step-badge">Step 08</div>
+      <h2>Accessing Nagios Web Interface</h2>
+      <p>Sob kisu completed hole, je kono device-er web browser open kore nicher URL format input koro:</p>
+      <div class="url-box">
+        <span class="url-label">GET</span>
+        <span class="url-text">http://<span class="highlight">YOUR-SERVER-IP</span>/nagios4</span>
+      </div>
+      <p class="note-text">🔐 Login korar somoy <strong>Step 04</strong> e set kora username (<code class="inline-code">nagiosadmin</code>) ebong password input korte hobe.</p>
+    </section>
+
+    <header class="main-header" style="margin-top: 80px;">
+      <span class="part-badge" style="background:#10b981;">PART 2</span>
+      <h1>Automatic Web-based Host Adding Process</h1>
+      <p class="subtitle">Nagios Dashboard-e manual file edit chara web theke auto host add/edit/delete korar system setup</p>
+    </header>
+
+    <section id="prerequisite" class="doc-card">
+      <h2>Pre-requisites: Config Check & Restart</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo nagios4 -v /etc/nagios4/nagios.cfg
+sudo systemctl restart nagios4</code></pre>
+      </div>
+    </section>
+    
+    <section id="workflow" class="doc-card">
+      <h2>System Workflow Diagram</h2>
+      <div class="terminal-box">
+        <pre><code>http://192.168.0.239/nagios4/admin
+             │
+             ▼
+      [ Password Popup ]
+             │
+             ▼
+       [ Admin Panel ]
+             │
+             ▼
+  (Add / Edit / Delete Host)
+             │
+             ▼
+ [ Auto create .cfg file ]
+             │
+             ▼
+    [ nagios4 -v check ]
+             │
+             ▼
+[ systemctl reload nagios4 ]</code></pre>
+      </div>
+    </section>
+
+    <section id="auto-step-1" class="doc-card">
+      <div class="step-badge">Step 01</div>
+      <h2>Admin Panel Folder তৈরি করুন</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo mkdir -p /var/www/nagios-admin
+sudo chown -R www-data:www-data /var/www/nagios-admin</code></pre>
+      </div>
+    </section>
+
+    <section id="auto-step-2" class="doc-card">
+      <div class="step-badge">Step 02</div>
+      <h2>Apache URL Set করুন (/nagios4/admin)</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">File Create: /etc/apache2/conf-available/nagios4-admin.conf</div>
+        <pre><code>sudo nano /etc/apache2/conf-available/nagios4-admin.conf</code></pre>
+      </div>
+      <p class="table-caption">📝 Paste Inside File:</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Code Snippet</div>
+        <pre><code>Alias /nagios4/admin /var/www/nagios-admin
+&lt;Directory /var/www/nagios-admin&gt;
+    Options -Indexes
+    AllowOverride AuthConfig
+    Require all granted
+&lt;/Directory&gt;</code></pre>
+      </div>
+      <p class="table-caption">⚙️ Enable & Reload:</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo a2enconf nagios4-admin
+sudo systemctl reload apache2</code></pre>
+      </div>
+    </section>
+
+    <section id="auto-step-3" class="doc-card">
+      <div class="step-badge">Step 03</div>
+      <h2>Password Popup Enable করুন (Basic Auth)</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo apt install apache2-utils -y
+sudo htpasswd -c /etc/apache2/nagios-admin.htpasswd admin</code></pre>
+      </div>
+      <p class="table-caption">📝 Create .htaccess file:</p>
+      <div class="terminal-box">
+        <div class="terminal-header">File Create: /var/www/nagios-admin/.htaccess</div>
+        <pre><code>sudo nano /var/www/nagios-admin/.htaccess</code></pre>
+      </div>
+      <p class="table-caption">📝 Paste Inside File:</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Code Snippet</div>
+        <pre><code>AuthType Basic
+AuthName "Nagios Admin Panel"
+AuthUserFile /etc/apache2/nagios-admin.htpasswd
+Require valid-user</code></pre>
+      </div>
+    </section>
+
+    <section id="auto-step-4" class="doc-card">
+      <div class="step-badge">Step 04</div>
+      <h2>Nagios Backend Manage Script তৈরি করুন</h2>
+      <div class="terminal-box">
+        <div class="terminal-header">File Create: /usr/local/bin/nagios-host-manager.sh</div>
+        <pre><code>sudo nano /usr/local/bin/nagios-host-manager.sh</code></pre>
+      </div>
+      <p class="table-caption">📝 Paste full bash script here (refer to previous step doc).</p>
+      <p class="table-caption">⚙️ Grant Execute Permission:</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo chmod +x /usr/local/bin/nagios-host-manager.sh</code></pre>
+      </div>
+    </section>
+
+    <section id="auto-step-5" class="doc-card">
+      <div class="step-badge">Step 05</div>
+      <h2>www-data কে Limited sudo permission দিন</h2>
+      <p>Web server (<code class="inline-code">www-data</code> user) jeno securely bash script-ti chalate pare tai sudoers file-e ekti rule jog korte hobe.</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>sudo visudo</code></pre>
+      </div>
+      <p class="table-caption">📝 File-er ekdom sheshe giye nicher line ti paste koro:</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Paste Inside File (At bottom)</div>
+        <pre><code>www-data ALL=(ALL) NOPASSWD: /usr/local/bin/nagios-host-manager.sh</code></pre>
+      </div>
+      <p class="note-text">🛡️ Eta ekdom safe karon <code class="inline-code">www-data</code> user password chara shudhu matro ei ekti nirdishto script e chalate parbe, onno kono root command noy.</p>
+    </section>
+
+    <section id="auto-step-6" class="doc-card">
+      <div class="step-badge">Step 06</div>
+      <h2>Admin Panel PHP File (Frontend UI) তৈরি করুন</h2>
+      <p>Eti holo mool web interface jekhan theke tumi browser er madhyome host add, edit abong delete korbe.</p>
+      <div class="terminal-box">
+        <div class="terminal-header">File Create: /var/www/nagios-admin/index.php</div>
+        <pre><code>sudo nano /var/www/nagios-admin/index.php</code></pre>
+      </div>
+      <p class="table-caption">📝 Nicher puro PHP code-ti copy kore file-e paste kore save koro:</p>
+      <div class="terminal-box" style="max-height: 200px; overflow-y: auto;">
+        <div class="terminal-header">Paste PHP Script inside nano</div>
+        <pre><code>&lt;!-- Code Hidden in Script Block for brevity (paste your previously provided PHP script here) --&gt;</code></pre>
+      </div>
+    </section>
+
+    <section id="final-step" class="doc-card" style="border-left: 5px solid #10b981;">
+      <h2>🚀 Final Execution & Verification</h2>
+      <p>Sobkichu shesh hoye gele abar config file check kore Nagios reload korte hobe jate notun web panel properly kaaj kore.</p>
+      <div class="terminal-box">
+        <div class="terminal-header">Terminal Command</div>
+        <pre><code>nagios4 -v /etc/nagios4/nagios.cfg
+systemctl reload nagios4</code></pre>
+      </div>
+      <p class="table-caption">🌐 Browser Open koro abong ei link-e jao:</p>
+      <div class="url-box">
+        <span class="url-label">GET</span>
+        <span class="url-text">http://<span class="highlight">SERVER-IP</span>/nagios4/admin</span>
+      </div>
+      <p class="note-text">🎉 Congratulations! Tumake ebar admin password prompt korbe ar login korle tumi automatic host adding dashboard-e dhuke jabe!</p>
+    </section>
+
+  </main>
+
+</body>
+</html>

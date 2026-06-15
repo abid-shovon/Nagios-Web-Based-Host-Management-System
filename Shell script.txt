@@ -1,0 +1,184 @@
+#!/bin/bash
+
+ACTION="$1"
+OLD_HOST_NAME="$2"
+NEW_HOST_NAME="$3"
+HOST_IP="$4"
+EXTRA_INFO="$5"
+HOST_GROUP="$6"
+
+CONF_DIR="/etc/nagios4/conf.d"
+HOSTGROUP_FILE="$CONF_DIR/auto_hostgroups.cfg"
+
+validate_name() {
+    [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Invalid name. Use only A-Z, a-z, 0-9, _ and -"; exit 10; }
+}
+
+validate_ip() {
+    [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "Invalid IP address"; exit 11; }
+    IFS='.' read -r a b c d <<< "$1"
+    for o in "$a" "$b" "$c" "$d"; do
+        [ "$o" -ge 0 ] && [ "$o" -le 255 ] || { echo "Invalid IP address"; exit 11; }
+    done
+}
+
+auto_group_exists() {
+    [ -f "$HOSTGROUP_FILE" ] && grep -qE "^[[:space:]]*hostgroup_name[[:space:]]+$1[[:space:]]*$" "$HOSTGROUP_FILE"
+}
+
+add_group() {
+    validate_name "$HOST_GROUP"
+    touch "$HOSTGROUP_FILE"
+
+    if auto_group_exists "$HOST_GROUP"; then
+        return
+    fi
+
+cat >> "$HOSTGROUP_FILE" <<EOF
+
+define hostgroup {
+    hostgroup_name  $HOST_GROUP
+    alias           $HOST_GROUP
+}
+EOF
+}
+
+remove_group_block() {
+    GROUP="$1"
+    python3 - "$HOSTGROUP_FILE" "$GROUP" <<'PY'
+import sys, re, os
+file, group = sys.argv[1], sys.argv[2]
+
+if not os.path.exists(file):
+    sys.exit(0)
+
+data = open(file).read()
+
+pattern = r'\s*define\s+hostgroup\s*\{\s*hostgroup_name\s+' + re.escape(group) + r'\s+alias\s+.*?\s*\}\s*'
+data = re.sub(pattern, '\n', data, flags=re.S)
+
+open(file, 'w').write(data.strip() + "\n" if data.strip() else "")
+PY
+}
+
+remove_group_from_hosts() {
+    GROUP="$1"
+    for f in "$CONF_DIR"/auto_*.cfg "$CONF_DIR"/auto_*.disabled; do
+        [ -f "$f" ] || continue
+        [ "$(basename "$f")" = "auto_hostgroups.cfg" ] && continue
+        sed -i "/^[[:space:]]*hostgroups[[:space:]]*$GROUP[[:space:]]*$/d" "$f"
+    done
+}
+
+write_config() {
+    FILE_PATH="$1"
+    HNAME="$2"
+    HIP="$3"
+    HNOTE="$4"
+    HGROUP="$5"
+
+cat > "$FILE_PATH" <<EOF
+define host {
+    use                     generic-host
+    host_name               $HNAME
+    alias                   $HNAME
+    address                 $HIP
+    check_command           check-host-alive
+EOF
+
+[ -n "$HNOTE" ] && echo "    notes                   $HNOTE" >> "$FILE_PATH"
+[ -n "$HGROUP" ] && echo "    hostgroups              $HGROUP" >> "$FILE_PATH"
+
+cat >> "$FILE_PATH" <<EOF
+    max_check_attempts      5
+}
+
+define service {
+    use                     generic-service
+    host_name               $HNAME
+    service_description     PING
+    check_command           check_ping!100.0,20%!500.0,60%
+    max_check_attempts      3
+    check_interval          1
+    retry_interval          1
+}
+EOF
+}
+
+reload_nagios() {
+    nagios4 -v /etc/nagios4/nagios.cfg >/tmp/nagios-check.log 2>&1
+    if [ $? -eq 0 ]; then
+        systemctl reload nagios4
+        exit 0
+    else
+        cat /tmp/nagios-check.log
+        exit 20
+    fi
+}
+
+case "$ACTION" in
+
+add)
+    validate_name "$NEW_HOST_NAME"
+    validate_ip "$HOST_IP"
+    [ -z "$HOST_GROUP" ] && { echo "Host group is required"; exit 12; }
+
+    add_group
+    write_config "$CONF_DIR/auto_${NEW_HOST_NAME}.cfg" "$NEW_HOST_NAME" "$HOST_IP" "$EXTRA_INFO" "$HOST_GROUP"
+    reload_nagios
+    ;;
+
+edit)
+    validate_name "$OLD_HOST_NAME"
+    validate_name "$NEW_HOST_NAME"
+    validate_ip "$HOST_IP"
+    [ -z "$HOST_GROUP" ] && { echo "Host group is required"; exit 12; }
+
+    add_group
+
+    if [ -f "$CONF_DIR/auto_${OLD_HOST_NAME}.disabled" ]; then
+        rm -f "$CONF_DIR/auto_${OLD_HOST_NAME}.disabled"
+        write_config "$CONF_DIR/auto_${NEW_HOST_NAME}.disabled" "$NEW_HOST_NAME" "$HOST_IP" "$EXTRA_INFO" "$HOST_GROUP"
+    else
+        rm -f "$CONF_DIR/auto_${OLD_HOST_NAME}.cfg"
+        write_config "$CONF_DIR/auto_${NEW_HOST_NAME}.cfg" "$NEW_HOST_NAME" "$HOST_IP" "$EXTRA_INFO" "$HOST_GROUP"
+    fi
+    reload_nagios
+    ;;
+
+delete)
+    validate_name "$OLD_HOST_NAME"
+    rm -f "$CONF_DIR/auto_${OLD_HOST_NAME}.cfg" "$CONF_DIR/auto_${OLD_HOST_NAME}.disabled"
+    reload_nagios
+    ;;
+
+disable)
+    validate_name "$OLD_HOST_NAME"
+    [ -f "$CONF_DIR/auto_${OLD_HOST_NAME}.cfg" ] && mv "$CONF_DIR/auto_${OLD_HOST_NAME}.cfg" "$CONF_DIR/auto_${OLD_HOST_NAME}.disabled"
+    reload_nagios
+    ;;
+
+enable)
+    validate_name "$OLD_HOST_NAME"
+    [ -f "$CONF_DIR/auto_${OLD_HOST_NAME}.disabled" ] && mv "$CONF_DIR/auto_${OLD_HOST_NAME}.disabled" "$CONF_DIR/auto_${OLD_HOST_NAME}.cfg"
+    reload_nagios
+    ;;
+
+group_add)
+    [ -z "$HOST_GROUP" ] && { echo "Host group name is required"; exit 12; }
+    add_group
+    reload_nagios
+    ;;
+
+group_delete)
+    validate_name "$HOST_GROUP"
+    remove_group_from_hosts "$HOST_GROUP"
+    remove_group_block "$HOST_GROUP"
+    reload_nagios
+    ;;
+
+*)
+    echo "Invalid action"
+    exit 1
+    ;;
+esac

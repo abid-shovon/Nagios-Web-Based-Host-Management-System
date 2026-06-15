@@ -1,0 +1,111 @@
+<?php
+$message = "";
+$message_type = "success";
+
+function e($v) {
+    return htmlspecialchars($v ?? "", ENT_QUOTES, "UTF-8");
+}
+
+function getConfigValue($file, $key) {
+    $content = file_get_contents($file);
+    if (preg_match('/^\s*' . preg_quote($key, '/') . '\s+(.+)$/m', $content, $match)) {
+        return trim($match[1]);
+    }
+    return "";
+}
+
+function getHostGroups() {
+    $file = "/etc/nagios4/conf.d/auto_hostgroups.cfg";
+    $groups = [];
+
+    if (!file_exists($file)) return $groups;
+
+    $content = file_get_contents($file);
+    if (preg_match_all('/^\s*hostgroup_name\s+([A-Za-z0-9_-]+)\s*$/m', $content, $matches)) {
+        foreach ($matches[1] as $g) $groups[] = trim($g);
+    }
+
+    return array_values(array_unique($groups));
+}
+
+function runManager($action, $old="", $new="", $ip="", $info="", $group="") {
+    $cmd = "sudo /usr/local/bin/nagios-host-manager.sh "
+        . escapeshellarg($action) . " "
+        . escapeshellarg($old) . " "
+        . escapeshellarg($new) . " "
+        . escapeshellarg($ip) . " "
+        . escapeshellarg($info) . " "
+        . escapeshellarg($group);
+
+    exec($cmd, $output, $result);
+    return [$result, $output];
+}
+
+$hosts = [];
+
+foreach (glob("/etc/nagios4/conf.d/auto_*.cfg") as $file) {
+    if (basename($file) === "auto_hostgroups.cfg") continue;
+
+    $host = str_replace(["auto_", ".cfg"], "", basename($file));
+
+    $hosts[] = [
+        "name" => $host,
+        "ip" => getConfigValue($file, "address"),
+        "extra_info" => getConfigValue($file, "notes"),
+        "host_group" => getConfigValue($file, "hostgroups"),
+        "status" => "Enabled"
+    ];
+}
+
+foreach (glob("/etc/nagios4/conf.d/auto_*.disabled") as $file) {
+    $host = str_replace(["auto_", ".disabled"], "", basename($file));
+
+    $hosts[] = [
+        "name" => $host,
+        "ip" => getConfigValue($file, "address"),
+        "extra_info" => getConfigValue($file, "notes"),
+        "host_group" => getConfigValue($file, "hostgroups"),
+        "status" => "Disabled"
+    ];
+}
+
+usort($hosts, fn($a, $b) => strcmp($a["name"], $b["name"]));
+
+$hostgroups = getHostGroups();
+?>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Nagios Host Panel</title>
+<style>
+body { font-family: Arial; background:#f1f5f9; padding:20px; }
+table { width:100%; border-collapse:collapse; background:#fff; }
+th,td { padding:10px; border:1px solid #ddd; }
+th { background:#111827; color:#fff; }
+</style>
+</head>
+<body>
+
+<h2>Nagios Host Admin Panel</h2>
+
+<table>
+<tr>
+<th>Host</th>
+<th>IP</th>
+<th>Group</th>
+<th>Status</th>
+</tr>
+
+<?php foreach($hosts as $h): ?>
+<tr>
+<td><?= e($h["name"]) ?></td>
+<td><?= e($h["ip"]) ?></td>
+<td><?= e($h["host_group"]) ?></td>
+<td><?= e($h["status"]) ?></td>
+</tr>
+<?php endforeach; ?>
+
+</table>
+
+</body>
+</html>
